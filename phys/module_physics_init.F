@@ -30,6 +30,8 @@ CONTAINS
 !=================================================================
    SUBROUTINE phy_init ( id, config_flags, DT, restart, zfull, zhalf,     &
                          p_top, TSK,RADT,BLDT,CUDT,MPDT,         &
+                         rthrelaxten, rqvrelaxten,               &
+                         rurelaxten, rvrelaxten,                 & 
                          RUCUTEN, RVCUTEN,                       &
                          RTHCUTEN, RQVCUTEN, RQRCUTEN,           &
                          RQCCUTEN, RQSCUTEN, RQICUTEN,           &
@@ -447,6 +449,8 @@ CONTAINS
 
    REAL,     DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(INOUT) ::    & !BSINGH(PNNL)- should be declared inout
              RTHFTEN, RQVFTEN
+
+  REAL,     DIMENSION(ims:ime, kms:kme, jms:jme), INTENT(INOUT) :: rthrelaxten, rqvrelaxten, rurelaxten, rvrelaxten
 
    REAL,     DIMENSION( ims:ime , jms:jme ) , INTENT(OUT) ::           &
              RAINNC, RAINC, RAINCV, RAINNCV,  &
@@ -899,7 +903,7 @@ CONTAINS
 !-------------------------------------------------
 ! End of Noah-mosaic 
 !-------------------------------------------------  
-   
+
 ! IRRIGATION
   INTEGER,OPTIONAL,INTENT(OUT), DIMENSION( ims:ime,jms:jme):: irr_rand_field 
   INTEGER, OPTIONAL :: irr_ph,irr_freq 
@@ -909,6 +913,20 @@ CONTAINS
 REAL(KIND=8) :: co2dum,n2odum,ch4dum,f11dum,f12dum
 CHARACTER(LEN=8) :: name
 !-----------------------------------------------------------------
+
+   if (.not. restart) then 
+      DO j=jts, min0(jte, jde-1)
+         DO k=kts, min0(kte, kde-1)
+            DO i=its, min0(ite, ide-1)
+               rthrelaxten(i,k,j) = 0.
+               rqvrelaxten(i,k,j) = 0.
+               rurelaxten(i,k,j) = 0.
+               rvrelaxten(i,k,j) = 0.
+            ENDDO
+         ENDDO
+      ENDDO
+   end if
+
 
 #if ( EM_CORE == 1 )
 

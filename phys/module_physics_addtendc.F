@@ -28,6 +28,8 @@ CONTAINS
 SUBROUTINE update_phy_ten(rph_tendf,rt_tendf,ru_tendf,rv_tendf,moist_tendf, &
                       scalar_tendf,mu_tendf,                                &
                       RTHRATEN,RTHBLTEN,RTHCUTEN,RTHSHTEN,                  &
+                      rthrelaxten, rqvrelaxten,                             &
+                      rurelaxten, rvrelaxten,                               &
                       RUBLTEN,RUCUTEN,RUSHTEN,                              &
                       RVBLTEN,RVCUTEN,RVSHTEN,                              &
                       RQVBLTEN,RQCBLTEN,RQIBLTEN,RQNIBLTEN,&!RQNCBLTEN,       & !JOE
@@ -71,6 +73,10 @@ SUBROUTINE update_phy_ten(rph_tendf,rt_tendf,ru_tendf,rv_tendf,moist_tendf, &
 
    REAL, DIMENSION(ims:ime, kms:kme, jms:jme), INTENT(IN  ) ::   &
                                                        RTHRATEN, &
+                                                       rthrelaxten, &
+                                                       rqvrelaxten, &
+                                                       rurelaxten,  &
+                                                       rvrelaxten,  &
                                                        RTHBLTEN, &
                                                        RTHCUTEN, &
                                                        RTHSHTEN, &
@@ -119,6 +125,35 @@ SUBROUTINE update_phy_ten(rph_tendf,rt_tendf,ru_tendf,rv_tendf,moist_tendf, &
                       ids, ide, jds, jde, kds, kde,            &
                       ims, ime, jms, jme, kms, kme,            &
                       its, ite, jts, jte, kts, kte             )
+
+   if(config_flags%relax_temp .eqv. .true.) then
+      call add_a2a(rt_tendf, rthrelaxten, config_flags,        &
+           ids, ide, jds, jde, kds, kde,                       &
+           ims, ime, jms, jme, kms, kme,                       &
+           its, ite, jts, jte, kts, kte                        )
+   endif
+
+   if(config_flags%relax_qvapor .eqv. .true.) then
+      call add_a2a(moist_tendf(ims,kms,jms,P_QV),              &
+           rqvrelaxten, config_flags,                          &
+           ids, ide, jds, jde, kds, kde,                       &
+           ims, ime, jms, jme, kms, kme,                       &
+           its, ite, jts, jte, kts, kte                        )
+   endif
+      
+   if(config_flags%relax_u_winds .eqv. .true.) then
+      CALL add_a2c_u(ru_tendf, rurelaxten, config_flags,       &
+           ids, ide, jds, jde, kds, kde,                       &
+           ims, ime, jms, jme, kms, kme,                       &
+           its, ite, jts, jte, kts, kte                        )
+   endif
+
+   if(config_flags%relax_v_winds .eqv. .true.) then   
+      CALL add_a2c_v(rv_tendf, rvrelaxten, config_flags,       &
+           ids, ide, jds, jde, kds, kde,                       &
+           ims, ime, jms, jme, kms, kme,                       &
+           its, ite, jts, jte, kts, kte                        )
+   endif
 
    if (config_flags%bl_pbl_physics .gt. 0)                     &
       CALL phy_bl_ten(config_flags,rk_step,n_moist,n_scalar,   &
