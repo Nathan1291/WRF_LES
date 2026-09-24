@@ -1,5 +1,9 @@
 !WRF:MEDIATION_LAYER:SOLVER
 
+! Updated by T. Raupach in May 2020 using code originally written by Yi-Ling
+! Hwong for linear response function implementation. These changes are marked
+! with "Changed T. Raupach" and "End changed block".
+
 #define BENCH_START(A)
 #define BENCH_END(A)
 
@@ -48,8 +52,11 @@ CONTAINS
     USE module_fr_fire_driver_wrf, ONLY : fire_driver_em_step
     USE module_fddagd_driver, ONLY : fddagd_driver
     USE module_em, ONLY : init_zero_tendency
+    ! Changed T. Raupach.
     USE module_force_scm
     USE module_LRF
+    ! End changed block.
+    USE module_force_scm
     USE module_convtrans_prep
     USE module_big_step_utilities_em, ONLY : phy_prep
 !use module_scalar_tables
@@ -150,10 +157,11 @@ CONTAINS
 
    CHARACTER (LEN=256) :: mminlu
    CHARACTER (LEN=1000) :: message
-   LOGICAL, SAVE :: load_target_u_profiles = .true.
-   LOGICAL, SAVE :: load_target_v_profiles = .true.
-   LOGICAL, SAVE :: load_target_t_profiles = .true.
-   LOGICAL, SAVE :: load_target_q_profiles = .true.
+   ! Changed T. Raupach.
+   LOGICAL, SAVE :: load_target_uv_profiles = .true.
+   LOGICAL, SAVE :: load_target_tq_profiles = .true.
+   ! End changed block
+
    LOGICAL    :: do_bioe
 
 !  Added flag to use MEGANv2.1 file   BJG 3/28/19
@@ -236,6 +244,10 @@ BENCH_END(phy_prep_tim)
          IF( rc/= WRFU_SUCCESS)THEN
          CALL wrf_error_fatal('WRFU_TimeGet failed')
          ENDIF
+
+! Changed T. Raupach.
+! Only call radiation driver if const_rad_cooling is not set.
+if(config_flags%const_rad_cooling .eqv. .false.) then
 
 ! this driver is only needed to handle non-local shadowing effects
       CALL pre_radiation_driver ( grid, config_flags                           &
@@ -535,7 +547,26 @@ BENCH_START(rad_driver_tim)
 #endif
                                                       )
 
-BENCH_END(rad_driver_tim)
+     BENCH_END(rad_driver_tim)
+endif
+
+! Prescribe the radiative cooling profile as in Herman and Kuang (2013).
+   if(config_flags%const_rad_cooling .eqv. .true.) then
+      !$OMP PARALLEL DO   &
+      !$OMP PRIVATE (ij)
+      do ij = 1, grid%num_tiles
+         call fix_radiation(p=grid%p_hyd, pi=pi_phy, rthraten=grid%rthraten, &
+              ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde,          &
+              ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme,          &
+              ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe,          &
+              its=grid%i_start(ij), ite=grid%i_end(ij),                      &
+              jts=grid%j_start(ij), jte=grid%j_end(ij),                      &
+              kts=k_start, kte=k_end)
+      enddo
+      !$OMP END PARALLEL DO
+   end if
+! End changed block.
+
 
 !********* Surface driver
 ! surface
@@ -596,6 +627,10 @@ BENCH_START(surf_driver_tim)
 
 
       CALL surface_driver(                                                &
+           ! Changed T. Raupach.
+           ideal_evap_flag=config_flags%ideal_evaporation,                &
+           surface_wind=config_flags%surface_wind,                        &
+           ! End changed block.
      &        HYDRO_dt=HYDRO_dt,  sfcheadrt=grid%sfcheadrt,               &
      &        INFXSRT=grid%INFXSRT,  soldrain=grid%soldrain,              &
      &        qtiledrain=grid%qtiledrain,ZWATBLE2D=grid%ZWATBLE2D,        & ! tile drainage for WRF-Hydro
@@ -1683,96 +1718,101 @@ BENCH_START(shcu_driver_tim)
 #endif
 BENCH_END(shcu_driver_tim)
 
-! Load target temp profiles for nudging. 
-if((config_flags%relax_temp .eqv. .true.) .and. &
-     (load_target_t_profiles .eqv. .true.)) then
-   call read_target_profiles(num_levels=k_end-k_start, &
-        profile_file=config_flags%relax_t_profile_file, &
-        val=grid%relax_t_target_profile)
-   load_target_t_profiles = .false.
+! Changed T. Raupach.
+! Load target T and q profiles for stratospheric relaxation.
+if((config_flags%relax_stratosphere .eqv. .true.) .and. &
+     (load_target_tq_profiles .eqv. .true.)) then
+   call read_tq_target_profiles(num_levels=k_end-k_start, &
+        t_profile_file=config_flags%relax_t_profile_file, &
+        q_profile_file=config_flags%relax_q_profile_file, &
+        t_val=grid%relax_t_target_profile,                &
+        q_val=grid%relax_q_target_profile)
+   load_target_tq_profiles = .false.
 endif
 
-! Load target qvapor profiles for nudging. 
-if((config_flags%relax_qvapor .eqv. .true.) .and. &
-     (load_target_q_profiles .eqv. .true.)) then
-   call read_target_profiles(num_levels=k_end-k_start, &
-        profile_file=config_flags%relax_q_profile_file, &
-        val=grid%relax_q_target_profile)
-   load_target_q_profiles = .false.
-endif
-
-! Load target U profiles for nudging. 
-if((config_flags%relax_u_winds .eqv. .true.) .and. &
-     (load_target_u_profiles .eqv. .true.)) then
-   call read_target_profiles(num_levels=k_end-k_start, &
-        profile_file=config_flags%relax_u_profile_file, &
-        val=grid%relax_u_target_profile)
-   load_target_u_profiles = .false.
-endif
-
-! Load target V profiles for nudging. 
-if((config_flags%relax_v_winds .eqv. .true.) .and. &
-     (load_target_v_profiles .eqv. .true.)) then
-   call read_target_profiles(num_levels=k_end-k_start, &
-        profile_file=config_flags%relax_v_profile_file, &
-        val=grid%relax_v_target_profile)
-   load_target_v_profiles = .false.
+! Load target U and V profiles for wind relaxation.
+if(((config_flags%relax_u_winds .eqv. .true.) .or. &
+     (config_flags%relax_v_winds .eqv. .true.)) .and. &
+     (load_target_uv_profiles .eqv. .true.)) then
+   call read_wind_target_profiles(num_levels=k_end-k_start, &
+        u_profile_file=config_flags%relax_u_profile_file,   &
+        v_profile_file=config_flags%relax_v_profile_file,   &
+        u_val=grid%relax_u_target_profile,                  &
+        v_val=grid%relax_v_target_profile)
+   load_target_uv_profiles = .false.
 endif
 
 !$OMP PARALLEL DO PRIVATE (ij)
 do ij = 1, grid%num_tiles
-! Relax u? 
-    if(config_flags%relax_u_winds .eqv. .true.) then
-       call relax_var_to_profile(ten=grid%rurelaxten, var=grid%u_phy,   &
-            p=grid%p_hyd, tau=config_flags%relaxation_time_scale,          &
-            target_profile=grid%relax_u_target_profile,                    &
-            ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
-            ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
-            ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe, &
-           its=grid%i_start(ij), ite=grid%i_end(ij),             &
-           jts=grid%j_start(ij), jte=grid%j_end(ij),             &
-           kts=k_start, kte=k_end)
-    endif
-    
-    ! Relax v?
-    if(config_flags%relax_v_winds .eqv. .true.) then
-       call relax_var_to_profile(ten=grid%rvrelaxten, var=grid%v_phy,   &
-            p=grid%p_hyd, tau=config_flags%relaxation_time_scale,          &
-            target_profile=grid%relax_v_target_profile,                    &
-            ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
-            ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
-            ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe, &
-           its=grid%i_start(ij), ite=grid%i_end(ij),             &
-           jts=grid%j_start(ij), jte=grid%j_end(ij),             &
-           kts=k_start, kte=k_end)
-    endif
+   ! Zero tendencies.
+   call zero_tendencies( &
+        thforceten=grid%rthforceten, qvforceten=grid%rqvforceten, &
+        threlaxten=grid%rthrelaxten, qvrelaxten=grid%rqvrelaxten, &
+        urelaxten=grid%rurelaxten, vrelaxten=grid%rvrelaxten,     &
+        ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde,     &
+        ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme,     &
+        ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe,     &
+        its=grid%i_start(ij), ite=grid%i_end(ij),                 &
+        jts=grid%j_start(ij), jte=grid%j_end(ij),                 &
+        kts=k_start, kte=k_end)        
 
-    ! Relax T?
-    if(config_flags%relax_temp .eqv. .true.) then
-       call relax_var_to_profile(ten=grid%rthrelaxten, var=grid%t_phy,   &
-            p=grid%p_hyd, tau=config_flags%relaxation_time_scale,          &
-            target_profile=grid%relax_t_target_profile,                    &
-            is_temp=.true., pi=pi_phy,                         &
-            ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
-            ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
-            ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe, &
-           its=grid%i_start(ij), ite=grid%i_end(ij),             &
-           jts=grid%j_start(ij), jte=grid%j_end(ij),             &
-           kts=k_start, kte=k_end)
-    endif
+   ! Perturb T and Q for LRF analysis.
+   call force_LRF(perturb_t=config_flags%perturb_t,           &
+        perturb_q=config_flags%perturb_q,                     &
+        p_pert=config_flags%p_pert,                           &
+        TtendAmp=config_flags%TtendAmp,                       &
+        QtendAmp=config_flags%QtendAmp,                       &
+        p=grid%p_hyd, pi=pi_phy,                              &
+        thten=grid%rthforceten,                               &
+        qvten=grid%rqvforceten,                               &
+        ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
+        ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
+        ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe, &
+        its=grid%i_start(ij), ite=grid%i_end(ij),             &
+        jts=grid%j_start(ij), jte=grid%j_end(ij),             &
+        kts=k_start, kte=k_end)
 
-    if(config_flags%relax_qvapor .eqv. .true.) then
-       call relax_var_to_profile(ten=grid%rqvrelaxten, var=moist(ims,kms,jms,P_QV),   &
-            p=grid%p_hyd, tau=config_flags%relaxation_time_scale,          &
-            target_profile=grid%relax_q_target_profile,                    &
-            ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
-            ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
-            ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe, &
+   ! Relax winds to given profiles?
+   if((config_flags%relax_u_winds .eqv. .true.) .or. &
+      (config_flags%relax_v_winds .eqv. .true.)) then
+      call relax_winds_to_profile(                               &
+           uten=grid%rurelaxten, vten=grid%rvrelaxten,           &
+           u=grid%u_phy, v=grid%v_phy, p=grid%p_hyd,             &
+           tau=config_flags%wind_relaxation_time,                &
+           target_wind_u=grid%relax_u_target_profile,            &
+           target_wind_v=grid%relax_v_target_profile,            &
+           extend_relaxation_u=config_flags%extend_wind_relax_u, &
+           extend_relaxation_v=config_flags%extend_wind_relax_v, &
+           apply_u=config_flags%relax_u_winds,                   &
+           apply_v=config_flags%relax_v_winds,                   &
+           relax_mean_wind=config_flags%relax_mean_wind,         &
+           ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
+           ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
+           ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe, &
            its=grid%i_start(ij), ite=grid%i_end(ij),             &
            jts=grid%j_start(ij), jte=grid%j_end(ij),             &
            kts=k_start, kte=k_end)
-    endif
+   endif
+
+   ! Relax stratospheric T and q?
+   if(config_flags%relax_stratosphere .eqv. .true.) then
+      ! Relax T and q in stratosphere.
+      call relax_stratospheric_t_qv(                             &
+           t_phy=grid%t_phy, qv=moist(ims,kms,jms,P_QV),         &
+           thten=grid%rthrelaxten, qvten=grid%rqvrelaxten,       &
+           p=grid%p_hyd, pi=pi_phy,                              &
+           target_t=grid%relax_t_target_profile,                 &
+           target_q=grid%relax_q_target_profile,                 &
+           ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
+           ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
+           ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe, &
+           its=grid%i_start(ij), ite=min(grid%i_end(ij), ide-1), &
+           jts=grid%j_start(ij), jte=min(grid%j_end(ij), jde-1), &
+           kts=k_start, kte=min(k_end, kde-1))
+   endif
 enddo
+!$OMP END PARALLEL DO
+! End changed block.
 
 ! JPH call force_scm to update bl tendencies
       CALL force_scm(itimestep=grid%itimestep,dt=grid%dt                  &
@@ -1849,7 +1889,7 @@ enddo
      &             ,z=grid%z,z_at_w=grid%z_at_w                           &
      &             ,th=th_phy, qv=moist(ims,kms,jms,P_QV)                 &
      &             ,ql=moist(ims,kms,jms,P_QC)                            &
-     &             ,u=grid%u_phy, v=grid%v_phy                            &
+     &             ,u=grid%u_phy, v=grid%v_phy                                      &
      &             ,thten=grid%rthblten, qvten=grid%rqvblten              &
      &             ,qlten=grid%rqcblten                                   &
      &             ,uten=grid%rublten, vten=grid%rvblten                  &

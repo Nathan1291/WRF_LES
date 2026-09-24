@@ -27,9 +27,13 @@ CONTAINS
 
 SUBROUTINE update_phy_ten(rph_tendf,rt_tendf,ru_tendf,rv_tendf,moist_tendf, &
                       scalar_tendf,mu_tendf,                                &
-                      RTHRATEN,RTHBLTEN,RTHCUTEN,RTHSHTEN,                  &
+                      ! Changed T. Raupach 21.05.2020.
+                      RTHRATEN,                                             &
+                      rthforceten, rqvforceten,                             &
                       rthrelaxten, rqvrelaxten,                             &
                       rurelaxten, rvrelaxten,                               &
+                      ! End changed block.
+                      RTHBLTEN,RTHCUTEN,RTHSHTEN,                           &
                       RUBLTEN,RUCUTEN,RUSHTEN,                              &
                       RVBLTEN,RVCUTEN,RVSHTEN,                              &
                       RQVBLTEN,RQCBLTEN,RQIBLTEN,RQNIBLTEN,&!RQNCBLTEN,       & !JOE
@@ -73,10 +77,14 @@ SUBROUTINE update_phy_ten(rph_tendf,rt_tendf,ru_tendf,rv_tendf,moist_tendf, &
 
    REAL, DIMENSION(ims:ime, kms:kme, jms:jme), INTENT(IN  ) ::   &
                                                        RTHRATEN, &
+                                                       ! Changed T. Raupach 21.05.2020.
+                                                       rthforceten, &
+                                                       rqvforceten, &
                                                        rthrelaxten, &
                                                        rqvrelaxten, &
                                                        rurelaxten,  &
                                                        rvrelaxten,  &
+                                                       ! End changed block.
                                                        RTHBLTEN, &
                                                        RTHCUTEN, &
                                                        RTHSHTEN, &
@@ -126,14 +134,32 @@ SUBROUTINE update_phy_ten(rph_tendf,rt_tendf,ru_tendf,rv_tendf,moist_tendf, &
                       ims, ime, jms, jme, kms, kme,            &
                       its, ite, jts, jte, kts, kte             )
 
-   if(config_flags%relax_temp .eqv. .true.) then
+   ! Changed T. Raupach 22.05.2020.
+   ! If forcing T or QV for LRF, add the perturbation amounts to temperature
+   ! and moisture tendencies.
+   if(config_flags%perturb_t .eqv. .true.) then
+      CALL add_a2a(rt_tendf,rthforceten,config_flags,          &
+           ids, ide, jds, jde, kds, kde,                       &
+           ims, ime, jms, jme, kms, kme,                       &
+           its, ite, jts, jte, kts, kte                        )
+   end if
+
+   if(config_flags%perturb_q .eqv. .true.) then
+      if(P_QV .ge. PARAM_FIRST_SCALAR) then
+         CALL add_a2a(moist_tendf(ims,kms,jms,P_QV),           &
+              rqvforceten, config_flags,                       &
+              ids, ide, jds, jde, kds, kde,                    &
+              ims, ime, jms, jme, kms, kme,                    &
+              its, ite, jts, jte, kts, kte                     )
+      endif
+   endif
+
+   if(config_flags%relax_stratosphere .eqv. .true.) then
       call add_a2a(rt_tendf, rthrelaxten, config_flags,        &
            ids, ide, jds, jde, kds, kde,                       &
            ims, ime, jms, jme, kms, kme,                       &
            its, ite, jts, jte, kts, kte                        )
-   endif
 
-   if(config_flags%relax_qvapor .eqv. .true.) then
       call add_a2a(moist_tendf(ims,kms,jms,P_QV),              &
            rqvrelaxten, config_flags,                          &
            ids, ide, jds, jde, kds, kde,                       &
@@ -154,7 +180,8 @@ SUBROUTINE update_phy_ten(rph_tendf,rt_tendf,ru_tendf,rv_tendf,moist_tendf, &
            ims, ime, jms, jme, kms, kme,                       &
            its, ite, jts, jte, kts, kte                        )
    endif
-
+   ! End changed block.
+   
    if (config_flags%bl_pbl_physics .gt. 0)                     &
       CALL phy_bl_ten(config_flags,rk_step,n_moist,n_scalar,   &
                       rt_tendf,ru_tendf,rv_tendf,moist_tendf,  &
@@ -2506,11 +2533,17 @@ SUBROUTINE add_a2c_v(lvar,rvar,config_flags,                &
         config_flags%nested) j_start = MAX(jds+1,jts)
    IF ( config_flags%specified .or. &
         config_flags%nested) j_end   = MIN(jde-1,jte)
-      IF ( config_flags%periodic_x ) i_start = its
-      IF ( config_flags%periodic_x ) i_end = MIN( ite, ide-1 )
+   ! Changed T. Raupach
+   !IF ( config_flags%periodic_x ) i_start = its
+   !IF ( config_flags%periodic_x ) i_end = MIN( ite, ide-1 )
+   IF ( config_flags%periodic_y ) j_start = jts
+   IF ( config_flags%periodic_y ) j_end = jte
+   ! End changed block.
 
    DO j = j_start,j_end
-   DO k = kts,kte
+   ! Changed T. Raupach
+   DO k = kts,ktf
+   ! End changed block.
    DO i = i_start,i_end
       lvar(i,k,j) = lvar(i,k,j) + &
                      0.5*(rvar(i,k,j)+rvar(i,k,j-1))

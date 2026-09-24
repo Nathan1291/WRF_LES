@@ -30,8 +30,11 @@ CONTAINS
 !=================================================================
    SUBROUTINE phy_init ( id, config_flags, DT, restart, zfull, zhalf,     &
                          p_top, TSK,RADT,BLDT,CUDT,MPDT,         &
+                         ! Changed T. Raupach 21.05.2020.
+                         rthforceten, rqvforceten,               &
                          rthrelaxten, rqvrelaxten,               &
                          rurelaxten, rvrelaxten,                 & 
+                         ! End changed block.
                          RUCUTEN, RVCUTEN,                       &
                          RTHCUTEN, RQVCUTEN, RQRCUTEN,           &
                          RQCCUTEN, RQSCUTEN, RQICUTEN,           &
@@ -450,8 +453,6 @@ CONTAINS
    REAL,     DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(INOUT) ::    & !BSINGH(PNNL)- should be declared inout
              RTHFTEN, RQVFTEN
 
-  REAL,     DIMENSION(ims:ime, kms:kme, jms:jme), INTENT(INOUT) :: rthrelaxten, rqvrelaxten, rurelaxten, rvrelaxten
-
    REAL,     DIMENSION( ims:ime , jms:jme ) , INTENT(OUT) ::           &
              RAINNC, RAINC, RAINCV, RAINNCV,  &
              SNOWNC, SNOWNCV, GRAUPELNC, GRAUPELNCV
@@ -473,6 +474,12 @@ CONTAINS
 
   REAL,     DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(INOUT) ::    & !BSINGH(PNNL)- should be declared inout
              RUBLTEN,RVBLTEN,RTHBLTEN,RQVBLTEN,RQCBLTEN,RQIBLTEN,EXCH_H,TKE_PBL
+
+  ! Changed T. Raupach 21.05.2020.
+  REAL,     DIMENSION(ims:ime, kms:kme, jms:jme), INTENT(INOUT) :: rthforceten, rqvforceten, &
+       rthrelaxten, rqvrelaxten, rurelaxten, rvrelaxten
+  ! End changed block.
+
   REAL,     DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(INOUT), OPTIONAL :: QKE,pek,pep
 
   REAL,     DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(OUT), OPTIONAL :: &
@@ -903,7 +910,7 @@ CONTAINS
 !-------------------------------------------------
 ! End of Noah-mosaic 
 !-------------------------------------------------  
-
+   
 ! IRRIGATION
   INTEGER,OPTIONAL,INTENT(OUT), DIMENSION( ims:ime,jms:jme):: irr_rand_field 
   INTEGER, OPTIONAL :: irr_ph,irr_freq 
@@ -914,10 +921,15 @@ REAL(KIND=8) :: co2dum,n2odum,ch4dum,f11dum,f12dum
 CHARACTER(LEN=8) :: name
 !-----------------------------------------------------------------
 
+   ! Changed T. Raupach.
+   ! Initialize LRF tendencies to zero if not a restart. Note that even in a restart
+   ! the tendencies will be overwritten at each time stamp anyway.
    if (.not. restart) then 
       DO j=jts, min0(jte, jde-1)
          DO k=kts, min0(kte, kde-1)
             DO i=its, min0(ite, ide-1)
+               rthforceten(i,k,j) = 0.
+               rqvforceten(i,k,j) = 0.
                rthrelaxten(i,k,j) = 0.
                rqvrelaxten(i,k,j) = 0.
                rurelaxten(i,k,j) = 0.
@@ -926,6 +938,9 @@ CHARACTER(LEN=8) :: name
          ENDDO
       ENDDO
    end if
+   ! End changed block.
+
+!-------------------------------------------------  
 
 
 #if ( EM_CORE == 1 )
