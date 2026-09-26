@@ -5239,8 +5239,6 @@ END SUBROUTINE phy_prep
                                                            RQVBLTEN, &
                                                            RQCBLTEN, &
                                                            RQIBLTEN,    &
-                                                           rthforceten, &
-                                                           rqvforceten, &
                                                            rthrelaxten, &
                                                            rqvrelaxten, &
                                                            rurelaxten,  &
@@ -5448,11 +5446,20 @@ END SUBROUTINE phy_prep
 
    ENDIF
 
-  if(config_flags%relax_stratosphere .eqv. .true.) then
+   if(config_flags%relax_temp .eqv. .true.) then
       DO J=j_start,j_end
          DO K=k_start,k_end
             DO I=i_start,i_end
                rthrelaxten(I,K,J)=rthrelaxten(I,K,J)/(c1(k)*MUT(I,J)+c2(k))
+            ENDDO
+         ENDDO
+      ENDDO
+   endif
+         
+   if(config_flags%relax_qvapor .eqv. .true.) then
+      DO J=j_start,j_end
+         DO K=k_start,k_end
+            DO I=i_start,i_end
                rqvrelaxten(I,K,J)=rqvrelaxten(I,K,J)/(c1(k)*MUT(I,J)+c2(k))
             ENDDO
          ENDDO

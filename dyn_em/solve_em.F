@@ -79,7 +79,7 @@ SUBROUTINE solve_em ( grid , config_flags  &
    USE module_llxy, ONLY : proj_cassini
    USE module_avgflx_em, ONLY : zero_avgflx, upd_avgflx
    USE module_cpl, ONLY : coupler_on, cpl_settime, cpl_store_input
-   USE module_LRF, ONLY : read_tq_target_profiles, relax_stratospheric_t_qv
+   USE module_LRF, ONLY : read_tq_target_profiles, relax_var_to_profile
 
 #if (WRF_CMAQ == 1)
    use twoway_data_module

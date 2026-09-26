@@ -2651,16 +2651,25 @@ SUBROUTINE calculate_phy_tend (config_flags,c1,c2,                     &
 
 ! pbl
 
-   if(config_flags%relax_stratosphere .eqv. .true.) then
+   if(config_flags%relax_temp .eqv. .true.) then
       DO J=jts,jtf
          DO K=kts,ktf
             DO I=its,itf
                rthrelaxten(I,K,J)=(c1(k)*mut(I,J)+c2(k))*rthrelaxten(I,K,J)
-               rqvrelaxten(I,K,J)=(c1(k)*mut(I,J)+c2(k))*rqvrelaxten(I,K,J)
             ENDDO
          ENDDO
       ENDDO
    endif      
+
+   if(config_flags%relax_qvapor .eqv. .true.) then
+      DO J=jts,jtf
+         DO K=kts,ktf
+            DO I=its,itf
+               rqvrelaxten(I,K,J)=(c1(k)*mut(I,J)+c2(k))*rqvrelaxten(I,K,J)
+            ENDDO
+         ENDDO
+      ENDDO
+   endif 
    
    if(config_flags%relax_u_winds .eqv. .true.) then
       DO J=jts,jtf

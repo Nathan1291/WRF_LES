@@ -127,12 +127,14 @@ SUBROUTINE update_phy_ten(rph_tendf,rt_tendf,ru_tendf,rv_tendf,moist_tendf, &
                       ims, ime, jms, jme, kms, kme,            &
                       its, ite, jts, jte, kts, kte             )
 
-   if(config_flags%relax_stratosphere .eqv. .true.) then
+   if(config_flags%relax_temp .eqv. .true.) then
       call add_a2a(rt_tendf, rthrelaxten, config_flags,        &
            ids, ide, jds, jde, kds, kde,                       &
            ims, ime, jms, jme, kms, kme,                       &
            its, ite, jts, jte, kts, kte                        )
+   endif
 
+   if(config_flags%relax_qvapor .eqv. .true.) then
       call add_a2a(moist_tendf(ims,kms,jms,P_QV),              &
            rqvrelaxten, config_flags,                          &
            ids, ide, jds, jde, kds, kde,                       &
