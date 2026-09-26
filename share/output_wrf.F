@@ -103,6 +103,8 @@
 
     LOGICAL, EXTERNAL :: wrf_dm_on_monitor
 
+    integer :: tmpint
+
     WRITE(wrf_err_message,*)'output_wrf: begin, fid = ',fid
     CALL wrf_debug( 300 , wrf_err_message )
 
@@ -609,6 +611,25 @@ endif
 #if (EM_CORE == 1)
           CALL wrf_put_dom_ti_char ( fid , 'GRIDTYPE',  'C' , ierr )
 #endif
+
+          tmpint = merge(1.d0, 0.d0, config_flags%relax_u_winds)
+          call wrf_put_dom_ti_integer(fid, "RELAX_U_WINDS", tmpint, 1, ierr)
+
+          tmpint = merge(1.d0, 0.d0, config_flags%relax_v_winds)
+          call wrf_put_dom_ti_integer(fid, "RELAX_V_WINDS", tmpint, 1, ierr)
+
+          tmpint = merge(1.d0, 0.d0, config_flags%extend_wind_relax_u)
+          call wrf_put_dom_ti_integer(fid, "EXTEND_WIND_RELAX_U", tmpint, 1, ierr)
+
+          tmpint = merge(1.d0, 0.d0, config_flags%extend_wind_relax_v)
+          call wrf_put_dom_ti_integer(fid, "EXTEND_WIND_RELAX_V", tmpint, 1, ierr)
+          
+          call wrf_put_dom_ti_real(fid, "WIND_RELAXATION_TIME", &
+               config_flags%wind_relaxation_time, 1, ierr)
+
+          tmpint = merge(1.d0, 0.d0, config_flags%relax_stratosphere)
+          call wrf_put_dom_ti_integer(fid, "RELAX_STRATOSPHERE", tmpint, 1, ierr)
+          
 
 ! added these fields for W. Skamarock, 020402, JM
     ibuf(1) = diff_opt

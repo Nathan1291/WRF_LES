@@ -49,6 +49,7 @@ CONTAINS
     USE module_fddagd_driver, ONLY : fddagd_driver
     USE module_em, ONLY : init_zero_tendency
     USE module_force_scm
+    USE module_LRF
     USE module_convtrans_prep
     USE module_big_step_utilities_em, ONLY : phy_prep
 !use module_scalar_tables
@@ -149,6 +150,8 @@ CONTAINS
 
    CHARACTER (LEN=256) :: mminlu
    CHARACTER (LEN=1000) :: message
+   LOGICAL, SAVE :: load_target_uv_profiles = .true.
+   LOGICAL, SAVE :: load_target_tq_profiles = .true.
    LOGICAL    :: do_bioe
 
 !  Added flag to use MEGANv2.1 file   BJG 3/28/19
@@ -1677,6 +1680,83 @@ BENCH_START(shcu_driver_tim)
 #endif
 #endif
 BENCH_END(shcu_driver_tim)
+
+if((config_flags%relax_stratosphere .eqv. .true.) .and. &
+     (load_target_tq_profiles .eqv. .true.)) then
+   call read_tq_target_profiles(num_levels=k_end-k_start, &
+        t_profile_file=config_flags%relax_t_profile_file, &
+        q_profile_file=config_flags%relax_q_profile_file, &
+        t_val=grid%relax_t_target_profile,                &
+        q_val=grid%relax_q_target_profile)
+   load_target_tq_profiles = .false.
+endif
+
+! Load target U and V profiles for wind relaxation.
+if(((config_flags%relax_u_winds .eqv. .true.) .or. &
+     (config_flags%relax_v_winds .eqv. .true.)) .and. &
+     (load_target_uv_profiles .eqv. .true.)) then
+   call read_wind_target_profiles(num_levels=k_end-k_start, &
+        u_profile_file=config_flags%relax_u_profile_file,   &
+        v_profile_file=config_flags%relax_v_profile_file,   &
+        u_val=grid%relax_u_target_profile,                  &
+        v_val=grid%relax_v_target_profile)
+   load_target_uv_profiles = .false.
+endif
+
+!$OMP PARALLEL DO PRIVATE (ij)
+do ij = 1, grid%num_tiles
+   ! Zero tendencies.
+   call zero_tendencies( &
+        thforceten=grid%rthforceten, qvforceten=grid%rqvforceten, &
+        threlaxten=grid%rthrelaxten, qvrelaxten=grid%rqvrelaxten, &
+        urelaxten=grid%rurelaxten, vrelaxten=grid%rvrelaxten,     &
+        ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde,     &
+        ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme,     &
+        ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe,     &
+        its=grid%i_start(ij), ite=grid%i_end(ij),                 &
+        jts=grid%j_start(ij), jte=grid%j_end(ij),                 &
+        kts=k_start, kte=k_end)        
+
+   ! Relax winds to given profiles?
+   if((config_flags%relax_u_winds .eqv. .true.) .or. &
+      (config_flags%relax_v_winds .eqv. .true.)) then
+      call relax_winds_to_profile(                               &
+           uten=grid%rurelaxten, vten=grid%rvrelaxten,           &
+           u=grid%u_phy, v=grid%v_phy, p=grid%p_hyd,             &
+           tau=config_flags%wind_relaxation_time,                &
+           target_wind_u=grid%relax_u_target_profile,            &
+           target_wind_v=grid%relax_v_target_profile,            &
+           extend_relaxation_u=config_flags%extend_wind_relax_u, &
+           extend_relaxation_v=config_flags%extend_wind_relax_v, &
+           apply_u=config_flags%relax_u_winds,                   &
+           apply_v=config_flags%relax_v_winds,                   &
+           relax_mean_wind=config_flags%relax_mean_wind,         &
+           ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
+           ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
+           ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe, &
+           its=grid%i_start(ij), ite=grid%i_end(ij),             &
+           jts=grid%j_start(ij), jte=grid%j_end(ij),             &
+           kts=k_start, kte=k_end)
+   endif
+
+   ! Relax stratospheric T and q?
+   if(config_flags%relax_stratosphere .eqv. .true.) then
+      ! Relax T and q in stratosphere.
+      call relax_stratospheric_t_qv(                             &
+           t_phy=grid%t_phy, qv=moist(ims,kms,jms,P_QV),         &
+           thten=grid%rthrelaxten, qvten=grid%rqvrelaxten,       &
+           p=grid%p_hyd, pi=pi_phy,                              &
+           target_t=grid%relax_t_target_profile,                 &
+           target_q=grid%relax_q_target_profile,                 &
+           ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
+           ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
+           ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe, &
+           its=grid%i_start(ij), ite=min(grid%i_end(ij), ide-1), &
+           jts=grid%j_start(ij), jte=min(grid%j_end(ij), jde-1), &
+           kts=k_start, kte=min(k_end, kde-1))
+   endif
+enddo
+!$OMP END PARALLEL DO
 
 ! JPH call force_scm to update bl tendencies
       CALL force_scm(itimestep=grid%itimestep,dt=grid%dt                  &
