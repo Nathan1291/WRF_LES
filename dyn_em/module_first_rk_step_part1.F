@@ -1683,9 +1683,11 @@ BENCH_START(shcu_driver_tim)
 #endif
 BENCH_END(shcu_driver_tim)
 
-! Load target temp profiles for nudging. 
+! Load target temp profiles for nudging.
+write (6,*) "attempt to load profiles"
 if((config_flags%relax_temp .eqv. .true.) .and. &
      (load_target_t_profiles .eqv. .true.)) then
+   write (6,*) "calling loading t profile"
    call read_target_profiles(num_levels=k_end-k_start, &
         profile_file=config_flags%relax_t_profile_file, &
         val=grid%relax_t_target_profile)
@@ -1695,6 +1697,7 @@ endif
 ! Load target qvapor profiles for nudging. 
 if((config_flags%relax_qvapor .eqv. .true.) .and. &
      (load_target_q_profiles .eqv. .true.)) then
+   write (6,*) "calling loading qv profile"
    call read_target_profiles(num_levels=k_end-k_start, &
         profile_file=config_flags%relax_q_profile_file, &
         val=grid%relax_q_target_profile)
@@ -1704,6 +1707,7 @@ endif
 ! Load target U profiles for nudging. 
 if((config_flags%relax_u_winds .eqv. .true.) .and. &
      (load_target_u_profiles .eqv. .true.)) then
+   write (6,*) "calling loading u profile"
    call read_target_profiles(num_levels=k_end-k_start, &
         profile_file=config_flags%relax_u_profile_file, &
         val=grid%relax_u_target_profile)
@@ -1713,6 +1717,7 @@ endif
 ! Load target V profiles for nudging. 
 if((config_flags%relax_v_winds .eqv. .true.) .and. &
      (load_target_v_profiles .eqv. .true.)) then
+   write (6,*) "calling loading v profile"
    call read_target_profiles(num_levels=k_end-k_start, &
         profile_file=config_flags%relax_v_profile_file, &
         val=grid%relax_v_target_profile)
@@ -1722,6 +1727,17 @@ endif
 !$OMP PARALLEL DO PRIVATE (ij)
 do ij = 1, grid%num_tiles
 ! Relax u? 
+   ! Zero tendencies.
+   call zero_tendencies( &
+        threlaxten=grid%rthrelaxten, qvrelaxten=grid%rqvrelaxten, &
+        urelaxten=grid%rurelaxten, vrelaxten=grid%rvrelaxten,     &
+        ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde,     &
+        ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme,     &
+        ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe,     &
+        its=grid%i_start(ij), ite=grid%i_end(ij),                 &
+        jts=grid%j_start(ij), jte=grid%j_end(ij),                 &
+        kts=k_start, kte=k_end)   
+
     if(config_flags%relax_u_winds .eqv. .true.) then
        call relax_var_to_profile(ten=grid%rurelaxten, var=grid%u_phy,   &
             p=grid%p_hyd, tau=config_flags%relaxation_time_scale,          &

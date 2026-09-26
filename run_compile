@@ -153,7 +153,7 @@ $nest
 EOF_configure
 
 # Select queue depending on architecture option
-QUEUE=normal
+QUEUE=express
 NPROC=4
 
 # Find current directory project and path

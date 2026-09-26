@@ -117,9 +117,18 @@ subroutine relax_var_to_profile(    &
             endif
 
             ten(i,k,j) = ten(i,k,j) + relax_value
+            write(6,*) 'relax value = ', relax_value
+
           enddo
        enddo
     enddo
+
+
+    write(6,*) 'DEBUG: relax_var_to_profile'
+    write(6,*) 'tau = ', tau
+    write(6,*) 'inv_tau = ', inv_tau
+    write(6,*) 'is_temp present = ', present(is_temp)
+
   end subroutine relax_var_to_profile
   
   subroutine horizontal_means(v, out, &
@@ -197,6 +206,7 @@ subroutine relax_var_to_profile(    &
     k = 1
     do while(k .le. num_levels)
        read(10,*) vals(k)
+       write(6,*) 'TARGET PROFILE:', k, vals(k)
        k = k + 1
     enddo
 
