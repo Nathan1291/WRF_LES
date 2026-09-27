@@ -150,8 +150,10 @@ CONTAINS
 
    CHARACTER (LEN=256) :: mminlu
    CHARACTER (LEN=1000) :: message
-   LOGICAL, SAVE :: load_target_uv_profiles = .true.
-   LOGICAL, SAVE :: load_target_tq_profiles = .true.
+   LOGICAL, SAVE :: load_target_u_profiles = .true.
+   LOGICAL, SAVE :: load_target_v_profiles = .true.
+   LOGICAL, SAVE :: load_target_t_profiles = .true.
+   LOGICAL, SAVE :: load_target_q_profiles = .true.
    LOGICAL    :: do_bioe
 
 !  Added flag to use MEGANv2.1 file   BJG 3/28/19
@@ -1682,25 +1684,38 @@ BENCH_START(shcu_driver_tim)
 BENCH_END(shcu_driver_tim)
 
 if((config_flags%relax_temp .eqv. .true.) .and. &
-     (load_target_tq_profiles .eqv. .true.)) then
-   call read_tq_target_profiles(num_levels=k_end-k_start, &
-        t_profile_file=config_flags%relax_t_profile_file, &
-        q_profile_file=config_flags%relax_q_profile_file, &
-        t_val=grid%relax_t_target_profile,                &
-        q_val=grid%relax_q_target_profile)
-   load_target_tq_profiles = .false.
+     (load_target_t_profiles .eqv. .true.)) then
+   call read_target_profiles(num_levels=k_end-k_start, &
+        profile_file=config_flags%relax_t_profile_file, &
+        val=grid%relax_t_target_profile)
+   load_target_t_profiles = .false.
 endif
 
-! Load target U and V profiles for wind relaxation.
-if(((config_flags%relax_u_winds .eqv. .true.) .or. &
-     (config_flags%relax_v_winds .eqv. .true.)) .and. &
-     (load_target_uv_profiles .eqv. .true.)) then
-   call read_wind_target_profiles(num_levels=k_end-k_start, &
-        u_profile_file=config_flags%relax_u_profile_file,   &
-        v_profile_file=config_flags%relax_v_profile_file,   &
-        u_val=grid%relax_u_target_profile,                  &
-        v_val=grid%relax_v_target_profile)
-   load_target_uv_profiles = .false.
+! Load target qvapor profiles for nudging. 
+if((config_flags%relax_qvapor .eqv. .true.) .and. &
+     (load_target_q_profiles .eqv. .true.)) then
+   call read_target_profiles(num_levels=k_end-k_start, &
+        profile_file=config_flags%relax_q_profile_file, &
+        val=grid%relax_q_target_profile)
+   load_target_q_profiles = .false.
+endif
+
+! Load target U profiles for nudging. 
+if((config_flags%relax_u_winds .eqv. .true.) .and. &
+     (load_target_u_profiles .eqv. .true.)) then
+   call read_target_profiles(num_levels=k_end-k_start, &
+        profile_file=config_flags%relax_u_profile_file, &
+        val=grid%relax_u_target_profile)
+   load_target_u_profiles = .false.
+endif
+
+! Load target V profiles for nudging. 
+if((config_flags%relax_v_winds .eqv. .true.) .and. &
+     (load_target_v_profiles .eqv. .true.)) then
+   call read_target_profiles(num_levels=k_end-k_start, &
+        profile_file=config_flags%relax_v_profile_file, &
+        val=grid%relax_v_target_profile)
+   load_target_v_profiles = .false.
 endif
 
 !$OMP PARALLEL DO PRIVATE (ij)

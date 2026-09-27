@@ -204,44 +204,20 @@ subroutine relax_var_to_profile(    &
     close(unit=10, status='keep')
   end subroutine read_profile_file
   
-  subroutine read_wind_target_profiles(num_levels, u_profile_file, &
-       v_profile_file, u_val, v_val)
-    ! Read U and V profiles from two files.
+  subroutine read_target_profiles(num_levels, profile_file, val)
+    ! Read profile from a file.
     ! ---
     ! num_levels: The number of levels (values) to read, one per line.
-    ! u_profile_file: The file to read from for U.
-    ! v_profile_file: The file to read from for V.
-    ! u_val: The read values (output) for U.
-    ! v_val: The read values (output) for V.
+    ! profile_file: The file to read from.
+    ! val: The read values (output).
     
     implicit none
     integer, intent(in) :: num_levels
-    character(len=*), intent(in) :: u_profile_file, v_profile_file
-    real, dimension(num_levels), intent(inout) :: u_val, v_val
-    write(6,*) 'Loading target profiles for wind relaxation.'
+    character(len=*), intent(in) :: profile_file
+    real, dimension(num_levels), intent(inout) :: val
+    write(6,*) 'Loading target profiles for nudging.'
 
-    call read_profile_file(num_levels, u_profile_file, u_val)
-    call read_profile_file(num_levels, v_profile_file, v_val)
-  end subroutine read_wind_target_profiles
-
-  subroutine read_tq_target_profiles(num_levels, t_profile_file, &
-       q_profile_file, t_val, q_val)
-    ! Read U and V profiles from two files.
-    ! ---
-    ! num_levels: The number of levels (values) to read, one per line.
-    ! t_profile_file: The file to read from for T.
-    ! q_profile_file: The file to read from for q.
-    ! t_val: The read values (output) for T.
-    ! q_val: The read values (output) for q.
-    
-    implicit none
-    integer, intent(in) :: num_levels
-    character(len=*), intent(in) :: t_profile_file, q_profile_file
-    real, dimension(num_levels), intent(inout) :: t_val, q_val
-    write(6,*) 'Loading target profiles for T and q stratospheric relaxation.'
-
-    call read_profile_file(num_levels, t_profile_file, t_val)
-    call read_profile_file(num_levels, q_profile_file, q_val)
-  end subroutine read_tq_target_profiles
+    call read_profile_file(num_levels, profile_file, val)
+  end subroutine read_target_profiles
 
 end module module_LRF
